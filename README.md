@@ -23,7 +23,6 @@
   I R I
   
   R D R
-  
   I R I
   
 - **I** — Iron Ingot (`IRON_INGOT`)
