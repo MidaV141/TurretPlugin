@@ -1,0 +1,8 @@
+name: TurretPlugin
+version: 1.1
+main: me.midav141.turret.Main
+api-version: "1.20"
+commands:
+  giveturretcore:
+    description: Выдать предмет "Ядро турели" (только для оператора)
+    permission: turret.givecore
