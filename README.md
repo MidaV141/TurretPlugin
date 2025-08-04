@@ -18,19 +18,14 @@
 
 ## 📦 Turret Core Crafting Recipe
 
-<details>
-  <summary>Click to view recipe</summary>
-  I R I
-  
-  R D R
-  I R I
-  
-- **I** — Iron Ingot (`IRON_INGOT`)
-- **R** — Redstone (`REDSTONE`)
-- **D** — Dispenser (`DISPENSER`)
-- Center: Dispenser, surrounded by iron and redstone
-
-</details>
+<table>
+  <tr>
+    <td align="center">
+      <b>How to craft the Turret Core:</b><br>
+      <img src="assets/turret-cruft.png" alt="Turret Core Crafting Recipe" width="256">
+    </td>
+  </tr>
+</table>
 
 ---
 
