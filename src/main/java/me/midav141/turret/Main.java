@@ -1,36 +1,22 @@
 package me.midav141.turret;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.Arrow;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Monster;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
+import org.bukkit.command.*;
+import org.bukkit.entity.*;
+import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.ShapedRecipe;
+import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
-import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.ChatColor;
-import org.bukkit.GameMode;
 
 import java.util.*;
 
-public class Main extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor {
+public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
     private final Set<ArmorStand> turrets = new HashSet<>();
     private static final NamespacedKey TURRET_CORE_KEY = NamespacedKey.minecraft("turret_core");
@@ -44,26 +30,26 @@ public class Main extends JavaPlugin implements Listener, org.bukkit.command.Com
         getLogger().info("TurretPlugin enabled!");
     }
 
-    // ==== /giveturretcore: только для оператора ====
+    // ==== OP-only /giveturretcore command ====
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (cmd.getName().equalsIgnoreCase("giveturretcore")) {
             if (!(sender instanceof Player p)) {
-                sender.sendMessage("Command only for players!");
+                sender.sendMessage("Players only!");
                 return true;
             }
             if (!p.isOp()) {
-                p.sendMessage("§cOperator only!");
+                p.sendMessage(ChatColor.RED + "OPs only!");
                 return true;
             }
             p.getInventory().addItem(getTurretCoreItem());
-            p.sendMessage("§aGiven: §eTurret Core");
+            p.sendMessage(ChatColor.GREEN + "You received a Turret Core!");
             return true;
         }
         return false;
     }
 
-    // === Крафт и предмет для установки турели ===
+    // === Turret Core crafting recipe ===
 
     private void registerTurretCoreRecipe() {
         ItemStack turretCore = getTurretCoreItem();
@@ -76,35 +62,37 @@ public class Main extends JavaPlugin implements Listener, org.bukkit.command.Com
     }
 
     private ItemStack getTurretCoreItem() {
-        ItemStack item = new ItemStack(Material.NETHER_STAR); // Можно заменить на любой предмет
+        ItemStack item = new ItemStack(Material.NETHER_STAR);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName("§6Turret Core");
-        meta.setLore(Arrays.asList("§7Place on the ground to create a turret"));
+        meta.setDisplayName(ChatColor.GOLD + "Turret Core");
+        meta.setLore(Arrays.asList(
+                ChatColor.GRAY + "Place on the ground to build a turret"
+        ));
         item.setItemMeta(meta);
         return item;
     }
 
-    // === Установка турели правым кликом Turret Core ===
+    // === Place turret by right-clicking with Turret Core ===
     @EventHandler
     public void onPlayerUse(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         ItemStack item = event.getItem();
         if (item == null || !item.hasItemMeta()) return;
         ItemMeta meta = item.getItemMeta();
-        if (!meta.hasDisplayName() || !meta.getDisplayName().contains("Turret Core")) return;
+        if (!meta.hasDisplayName() || !ChatColor.stripColor(meta.getDisplayName()).equalsIgnoreCase("Turret Core"))
+            return;
 
         Block clicked = event.getClickedBlock();
         if (clicked == null) return;
         Location loc = clicked.getLocation().add(0, 1, 0);
         World world = loc.getWorld();
         if (!world.getBlockAt(loc).isEmpty()) {
-            event.getPlayer().sendMessage("§cNo space for turret!");
+            event.getPlayer().sendMessage(ChatColor.RED + "No space for the turret!");
             return;
         }
-        // Спавним турель
         ArmorStand as = world.spawn(loc.add(0.5, 0, 0.5), ArmorStand.class, st -> {
             st.setInvisible(false);
-            st.setInvulnerable(true);
+            st.setInvulnerable(false); // TURNT THIS OFF! Needed for break!
             st.setGravity(false);
             st.setCustomName("Turret");
             st.setCustomNameVisible(true);
@@ -118,26 +106,27 @@ public class Main extends JavaPlugin implements Listener, org.bukkit.command.Com
         turrets.add(as);
         event.getPlayer().sendMessage(ChatColor.GREEN + "Turret placed!");
 
-        // Минус 1 предмет, если не креатив
+        // Remove 1 item if not creative
         if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
             item.setAmount(item.getAmount() - 1);
         }
         event.setCancelled(true);
     }
 
-    // === Удаление турели ударом ===
+    // === Remove turret by hit ===
     @EventHandler
     public void onTurretBreak(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof ArmorStand stand)) return;
         if (!(event.getDamager() instanceof Player p)) return;
-        if (!"Turret".equals(stand.getCustomName())) return;
+        String name = stand.getCustomName();
+        if (name == null || !ChatColor.stripColor(name).equalsIgnoreCase("Turret")) return;
         stand.remove();
         turrets.remove(stand);
         p.sendMessage(ChatColor.RED + "Turret destroyed!");
         event.setCancelled(true);
     }
 
-    // === Логика турели: стреляет по hostile-мобам с прямой видимостью ===
+    // === Turret AI: Shoot hostile mobs in line of sight only ===
     private void startTurretTask() {
         new BukkitRunnable() {
             @Override
@@ -153,8 +142,8 @@ public class Main extends JavaPlugin implements Listener, org.bukkit.command.Com
                         turret.teleport(tl);
                         if (turret.getTicksLived() % 8 == 0) {
                             Arrow a = turret.getWorld().spawnArrow(
-                                tl.clone().add(0, 0.8, 0).add(dir.multiply(1.1)),
-                                dir, 2.5f, 0
+                                    tl.clone().add(0, 0.8, 0).add(dir.multiply(1.1)),
+                                    dir, 2.5f, 0
                             );
                             a.setPickupStatus(Arrow.PickupStatus.DISALLOWED);
                             a.setShooter(turret);
@@ -165,16 +154,16 @@ public class Main extends JavaPlugin implements Listener, org.bukkit.command.Com
         }.runTaskTimer(this, 1L, 1L);
     }
 
-    // Только hostile-мобы и только если видно!
+    // === Find nearest hostile mob in line of sight ===
     private LivingEntity findNearestMob(Location from, double radius, ArmorStand turret) {
         World world = from.getWorld();
         return world.getNearbyEntities(from, radius, radius, radius).stream()
-            .filter(e -> e instanceof Monster)
-            .filter(e -> e instanceof LivingEntity le
-                && !le.isDead()
-                && turret.hasLineOfSight(le))
-            .map(e -> (LivingEntity) e)
-            .min(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(from)))
-            .orElse(null);
+                .filter(e -> e instanceof Monster)
+                .filter(e -> e instanceof LivingEntity le
+                        && !le.isDead()
+                        && turret.hasLineOfSight(le))
+                .map(e -> (LivingEntity) e)
+                .min(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(from)))
+                .orElse(null);
     }
 }
