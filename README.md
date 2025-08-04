@@ -21,7 +21,9 @@
 <details>
   <summary>Click to view recipe</summary>
   I R I
+  
   R D R
+  
   I R I
   
 - **I** — Iron Ingot (`IRON_INGOT`)
